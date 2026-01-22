@@ -1,160 +1,136 @@
-"use client";
+"use client"
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import remarkBreaks from 'remark-breaks';
-
-const vibeTags = [
-    'Generative ideation',
-    'Azure OpenAI',
-    'Realtime streaming',
-    'Business blueprints'
-];
-
-const metrics = [
-    { value: '12,840+', label: 'Ideas launched' },
-    { value: '~2.4s', label: 'Avg. response time' },
-    { value: '14', label: 'Industries covered' },
-    { value: '99.2%', label: 'User satisfaction' }
-];
+import Link from 'next/link';
+import { SignInButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
-    const [idea, setIdea] = useState<string>('…loading');
-    const [isStreaming, setIsStreaming] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const eventRef = useRef<EventSource | null>(null);
-    const bufferRef = useRef('');
+  const [isLoaded, setIsLoaded] = useState(false);
 
-    const startStream = useCallback(() => {
-        if (typeof window === 'undefined') {
-            return;
-        }
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
 
-        eventRef.current?.close();
-        bufferRef.current = '';
-        setIdea('…loading');
-        setError(null);
-        setIsStreaming(true);
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 relative overflow-hidden">
+      {/* Animated background orbs */}
+      <div className="floating-orb orb-one"></div>
+      <div className="floating-orb orb-two"></div>
+      <div className="floating-orb orb-three"></div>
+      <div className="noise-overlay"></div>
+      
+      <div className="container mx-auto px-4 py-12 relative z-10">
+        {/* Navigation */}
+        <nav className={`flex justify-between items-center mb-12 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+          <h1 className="text-3xl font-bold gradient-heading">
+            IdeaGen
+          </h1>
+          <div>
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button className="glass-pill hover:scale-105 transition-transform duration-300">
+                  Sign In
+                </button>
+              </SignInButton>
+            </SignedOut>
+            <SignedIn>
+              <div className="flex items-center gap-4">
+                <Link 
+                  href="/product" 
+                  className="glass-pill hover:scale-105 transition-transform duration-300"
+                >
+                  Go to App
+                </Link>
+                <UserButton afterSignOutUrl="/" />
+              </div>
+            </SignedIn>
+          </div>
+        </nav>
 
-        const evt = new EventSource('/api');
-        eventRef.current = evt;
-        evt.onmessage = (e) => {
-            if (e.data === '[END]') {
-                setIsStreaming(false);
-                bufferRef.current = bufferRef.current.trimStart();
-                evt.close();
-                eventRef.current = null;
-                return;
-            }
+        {/* Hero Section */}
+        <div className="text-center py-24">
+          <div className={`transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <span className="tagline mb-6 inline-block">
+              🚀 AI-Powered Business Ideas
+            </span>
+            <h2 className="text-6xl md:text-7xl font-bold gradient-heading mb-6 leading-tight">
+              Generate Your Next
+              <br />
+              Big Business Idea
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-400 mb-12 max-w-3xl mx-auto leading-relaxed">
+              Harness the power of AI to discover innovative business opportunities tailored for the AI agent economy. Transform your entrepreneurial vision into reality.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <button className="button-primary text-lg px-8 py-4">
+                    Get Started Free
+                  </button>
+                </SignInButton>
+              </SignedOut>
+              <SignedIn>
+                <Link href="/product">
+                  <button className="button-primary text-lg px-8 py-4">
+                    Generate Ideas Now
+                  </button>
+                </Link>
+              </SignedIn>
+              <a href="#features" className="button-secondary text-lg px-8 py-4">
+                Learn More
+              </a>
+            </div>
+          </div>
 
-            bufferRef.current += e.data ?? '';
-            setIdea(bufferRef.current.trimStart());
-        };
+          {/* Feature Cards */}
+          <div id="features" className={`grid md:grid-cols-3 gap-8 mt-24 transition-all duration-1000 delay-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="glass-panel idea-panel p-8 hover:scale-105 transition-all duration-300 cursor-pointer">
+              <div className="text-4xl mb-4">🤖</div>
+              <h3 className="text-2xl font-bold text-white mb-4">AI-Driven Insights</h3>
+              <p className="text-gray-300">
+                Leverage cutting-edge AI algorithms to analyze market trends and generate unique business ideas.
+              </p>
+            </div>
+            
+            <div className="glass-panel idea-panel p-8 hover:scale-105 transition-all duration-300 cursor-pointer">
+              <div className="text-4xl mb-4">⚡</div>
+              <h3 className="text-2xl font-bold text-white mb-4">Instant Generation</h3>
+              <p className="text-gray-300">
+                Get personalized business ideas in seconds, not hours. Speed up your innovation process.
+              </p>
+            </div>
+            
+            <div className="glass-panel idea-panel p-8 hover:scale-105 transition-all duration-300 cursor-pointer">
+              <div className="text-4xl mb-4">🎯</div>
+              <h3 className="text-2xl font-bold text-white mb-4">Market Focused</h3>
+              <p className="text-gray-300">
+                Ideas tailored specifically for the growing AI agent economy and digital marketplace.
+              </p>
+            </div>
+          </div>
 
-        evt.onerror = () => {
-            setIsStreaming(false);
-            setError('Lost connection to the idea stream. Try again.');
-            evt.close();
-            eventRef.current = null;
-            bufferRef.current = '';
-        };
-    }, []);
-
-    useEffect(() => {
-        startStream();
-
-        return () => {
-            eventRef.current?.close();
-        };
-    }, [startStream]);
-
-    return (
-        <main className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
-            <div className="floating-orb orb-one" />
-            <div className="floating-orb orb-two" />
-            <div className="floating-orb orb-three" />
-            <div className="noise-overlay" />
-
-            <section className="relative z-10 max-w-6xl mx-auto px-6 py-16 flex flex-col gap-12">
-                <header className="text-center space-y-6">
-                    <span className="tagline">AI Agents Studio · Powered by Azure OpenAI</span>
-                    <h1 className="gradient-heading text-4xl md:text-6xl font-black leading-tight">
-                        Business Idea Reactor
-                    </h1>
-                    <p className="text-lg text-indigo-100 max-w-3xl mx-auto">
-                        Spin up venture-ready concepts in seconds. We stream fresh strategy, positioning,
-                        and differentiation angles in real-time—perfect for founders, agencies, and builders
-                        chasing their next big launch.
-                    </p>
-                    <div className="flex flex-wrap items-center justify-center gap-3">
-                        {vibeTags.map((tag) => (
-                            <span key={tag} className="glass-pill text-sm uppercase tracking-wide">
-                                {tag}
-                            </span>
-                        ))}
-                    </div>
-
-                    <div className="flex flex-wrap justify-center gap-4">
-                        <button
-                            onClick={startStream}
-                            disabled={isStreaming}
-                            className="button-primary"
-                        >
-                            {isStreaming ? 'Streaming fresh idea…' : 'Generate a new idea'}
-                        </button>
-                        <button
-                            onClick={() => navigator.clipboard.writeText(idea)}
-                            className="button-secondary"
-                        >
-                            Copy current idea
-                        </button>
-                    </div>
-                </header>
-
-                <section className="grid grid-cols-2 md:grid-cols-4 gap-4 text-left">
-                    {metrics.map((metric) => (
-                        <div key={metric.label} className="glass-panel p-4 rounded-2xl text-left">
-                            <p className="text-2xl font-semibold text-white">{metric.value}</p>
-                            <p className="text-sm text-indigo-100/80">{metric.label}</p>
-                        </div>
-                    ))}
-                </section>
-
-                <section id="idea" className="relative">
-                    <div className="idea-glow" />
-                    <div className="glass-panel idea-panel">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                            <div>
-                                <p className="text-xs uppercase tracking-[0.2em] text-indigo-200">
-                                    Live AI output
-                                </p>
-                                <h2 className="text-2xl font-semibold text-white">
-                                    Your personalized business opportunity
-                                </h2>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-indigo-100">
-                                <span className={`pulse-dot ${isStreaming ? 'is-active' : ''}`} />
-                                {isStreaming ? 'Streaming in real-time' : 'Ready for another idea'}
-                            </div>
-                        </div>
-
-                        <div className="idea-scroll markdown-content prose prose-invert">
-                            {error ? (
-                                <div className="error-banner">
-                                    {error}
-                                </div>
-                            ) : (
-                                <ReactMarkdown
-                                    remarkPlugins={[remarkGfm, remarkBreaks]}
-                                >
-                                    {idea}
-                                </ReactMarkdown>
-                            )}
-                        </div>
-                    </div>
-                </section>
-            </section>
-        </main>
-    );
+          {/* Stats Section */}
+          <div className={`mt-24 transition-all duration-1000 delay-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="glass-panel idea-panel p-12">
+              <div className="grid md:grid-cols-3 gap-8 text-center">
+                <div>
+                  <div className="text-4xl font-bold gradient-heading mb-2">10K+</div>
+                  <div className="text-gray-300">Ideas Generated</div>
+                </div>
+                <div>
+                  <div className="text-4xl font-bold gradient-heading mb-2">95%</div>
+                  <div className="text-gray-300">Success Rate</div>
+                </div>
+                <div>
+                  <div className="text-4xl font-bold gradient-heading mb-2">24/7</div>
+                  <div className="text-gray-300">AI Available</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
 }

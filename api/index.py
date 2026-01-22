@@ -1,11 +1,15 @@
-from fastapi import FastAPI  # type: ignore
+from fastapi import FastAPI, Depends  # type: ignore
 from fastapi.responses import StreamingResponse  # type: ignore
 from openai import AzureOpenAI  # type: ignore
 import os
 from dotenv import load_dotenv
+from fastapi_clerk_auth import ClerkConfig, ClerkHTTPBearer, HTTPAuthorizationCredentials
 
 app = FastAPI()
 load_dotenv(override=True)
+
+clerk_config = ClerkConfig(jwks_url = os.getenv("CLERK_JWKS_URL"))
+clerk_guard =  ClerkHTTPBearer(clerk_config)
 
 endpoint = "https://genai-eus-catalyst.cognitiveservices.azure.com/"
 api_key = os.getenv("AZURE_OPENAI_API_KEY")
@@ -16,7 +20,13 @@ subscription_key = os.getenv("AZURE_OPENAI_API_KEY")
 api_version = "2025-01-01-preview"
 
 @app.get("/api")
-def idea():
+def idea(creds: HTTPAuthorizationCredentials = Depends(clerk_guard)):
+    user_id = creds.decoded["sub"]  # User ID from JWT - available for future use
+    # We now know which user is making the request! 
+    # You could use user_id to:
+    # - Track usage per user
+    # - Store generated ideas in a database
+    # - Apply user-specific limits or customization
 
     client = AzureOpenAI(
         api_version=api_version,
