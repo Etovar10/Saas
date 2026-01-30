@@ -1,233 +1,171 @@
-"use client";
+"use client"
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState, FormEvent } from 'react';
+import { useAuth } from '@clerk/nextjs';
+import DatePicker from 'react-datepicker';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import { SignedIn, SignedOut, SignInButton, useAuth, UserButton } from '@clerk/nextjs';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
+import { Protect, PricingTable, UserButton } from '@clerk/nextjs';
 
-const vibeTags = [
-    'Generative ideation',
-    'Azure OpenAI',
-    'Realtime streaming',
-    'Business blueprints'
-];
+function ConsultationForm() {
+    const { getToken } = useAuth();
 
-const metrics = [
-    { value: '12,840+', label: 'Ideas launched' },
-    { value: '~2.4s', label: 'Avg. response time' },
-    { value: '14', label: 'Industries covered' },
-    { value: '99.2%', label: 'User satisfaction' }
-];
+    // Form state
+    const [patientName, setPatientName] = useState('');
+    const [visitDate, setVisitDate] = useState<Date | null>(new Date());
+    const [notes, setNotes] = useState('');
 
-function normalizeMarkdown(input: string): string {
-    let out = input.replace(/\r\n/g, '\n');
-    // Ensure visible separation around horizontal rules
-    out = out.replace(/\s*---\s*/g, '\n\n---\n\n');
-    // Insert a blank line before ATX headings if jammed to previous text
-    out = out.replace(/([^\n])\s*(#{1,6}\s)/g, '$1\n\n$2');
-    // Ensure unordered list items start on a new line
-    out = out.replace(/([^\n])\s*(-\s)/g, '$1\n$2');
-    // Ensure ordered list items start on a new line
-    out = out.replace(/([^\n])\s*(\d+\.\s)/g, '$1\n$2');
-    // Collapse excessive blank lines
-    out = out.replace(/\n{3,}/g, '\n\n');
-    return out;
-}
+    // Streaming state
+    const [output, setOutput] = useState('');
+    const [loading, setLoading] = useState(false);
 
-function IdeaLab() {
-    const { isLoaded, getToken } = useAuth();
-    const [idea, setIdea] = useState<string>('');
-    const [isStreaming, setIsStreaming] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [hasFirstToken, setHasFirstToken] = useState(false);
-    const controllerRef = useRef<AbortController | null>(null);
-    const bufferRef = useRef('');
+    async function handleSubmit(e: FormEvent) {
+        e.preventDefault();
+        setOutput('');
+        setLoading(true);
 
-    const startStream = useCallback(async () => {
-        if (!isLoaded) {
+        const jwt = await getToken();
+        if (!jwt) {
+            setOutput('Authentication required');
+            setLoading(false);
             return;
         }
 
-        controllerRef.current?.abort();
-
-        bufferRef.current = '';
-        setIdea('');
-        setError(null);
-        setIsStreaming(true);
-        setHasFirstToken(false);
-
         const controller = new AbortController();
-        controllerRef.current = controller;
-        const token = getToken ? await getToken() : null;
+        let buffer = '';
 
-        fetchEventSource('/api', {
+        await fetchEventSource('/api', {
             signal: controller.signal,
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-            onmessage(ev) {
-                if (ev.data === '[END]') {
-                    setIsStreaming(false);
-                    controller.abort();
-                    controllerRef.current = null;
-                    const cleaned = normalizeMarkdown(bufferRef.current.trim());
-                    setIdea(cleaned);
-                    return;
-                }
-
-                setHasFirstToken(true);
-                bufferRef.current += ev.data ?? '';
-                const preview = normalizeMarkdown(bufferRef.current);
-                setIdea(preview.trimStart());
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${jwt}`,
             },
-            onclose() {
-                setIsStreaming(false);
-                controllerRef.current = null;
+            body: JSON.stringify({
+                patient_name: patientName,
+                date_of_visit: visitDate?.toISOString().slice(0, 10),
+                notes,
+            }),
+            onmessage(ev) {
+                buffer += ev.data;
+                setOutput(buffer);
+            },
+            onclose() { 
+                setLoading(false); 
             },
             onerror(err) {
-                throw err;
+                console.error('SSE error:', err);
+                controller.abort();
+                setLoading(false);
             },
-        }).catch((err) => {
-            if (controller.signal.aborted) {
-                return;
-            }
-            console.error('Streaming failed', err);
-            setError('Streaming stalled. Please try again.');
-            setIsStreaming(false);
-            controllerRef.current = null;
         });
-    }, [getToken, isLoaded]);
-
-    useEffect(() => {
-        return () => {
-            controllerRef.current?.abort();
-        };
-    }, []);
-
-    const displayedIdea = idea || 'Tap “Generate a new idea” to stream something fresh.';
-    const showLoader = isStreaming && !hasFirstToken && !error;
+    }
 
     return (
-        <main className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
-            <div className="floating-orb orb-one" />
-            <div className="floating-orb orb-two" />
-            <div className="floating-orb orb-three" />
-            <div className="noise-overlay" />
+        <div className="container mx-auto px-4 py-12 max-w-3xl">
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-8">
+                Consultation Notes
+            </h1>
 
-            <section className="relative z-10 max-w-6xl mx-auto px-6 py-16 flex flex-col gap-12">
-                <header className="text-center space-y-6">
-                    <span className="tagline">AI Agents Studio · Powered by Azure OpenAI</span>
-                    <h1 className="gradient-heading text-4xl md:text-6xl font-black leading-tight">
-                        Business Idea Reactor
-                    </h1>
-                    <p className="text-lg text-indigo-100 max-w-3xl mx-auto">
-                        Spin up venture-ready concepts in seconds. We stream fresh strategy, positioning,
-                        and differentiation angles in real-time—perfect for founders, agencies, and builders
-                        chasing their next big launch.
-                    </p>
-                    <div className="flex flex-wrap items-center justify-center gap-3">
-                        {vibeTags.map((tag) => (
-                            <span key={tag} className="glass-pill text-sm uppercase tracking-wide">
-                                {tag}
-                            </span>
-                        ))}
-                    </div>
+            <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+                <div className="space-y-2">
+                    <label htmlFor="patient" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Patient Name
+                    </label>
+                    <input
+                        id="patient"
+                        type="text"
+                        required
+                        value={patientName}
+                        onChange={(e) => setPatientName(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                        placeholder="Enter patient's full name"
+                    />
+                </div>
 
-                    <div className="flex flex-wrap justify-center gap-4">
-                        <button
-                            onClick={startStream}
-                            disabled={isStreaming}
-                            className="button-primary"
-                        >
-                            {isStreaming ? 'Streaming fresh idea…' : 'Generate a new idea'}
-                        </button>
-                        <button
-                            onClick={() => navigator.clipboard.writeText(idea)}
-                            className="button-secondary"
-                        >
-                            Copy current idea
-                        </button>
-                    </div>
-                </header>
+                <div className="space-y-2">
+                    <label htmlFor="date" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Date of Visit
+                    </label>
+                    <DatePicker
+                        id="date"
+                        selected={visitDate}
+                        onChange={(d: Date | null) => setVisitDate(d)}
+                        dateFormat="yyyy-MM-dd"
+                        placeholderText="Select date"
+                        required
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    />
+                </div>
 
-                <section className="grid grid-cols-2 md:grid-cols-4 gap-4 text-left">
-                    {metrics.map((metric) => (
-                        <div key={metric.label} className="glass-panel p-4 rounded-2xl text-left">
-                            <p className="text-2xl font-semibold text-white">{metric.value}</p>
-                            <p className="text-sm text-indigo-100/80">{metric.label}</p>
-                        </div>
-                    ))}
-                </section>
+                <div className="space-y-2">
+                    <label htmlFor="notes" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Consultation Notes
+                    </label>
+                    <textarea
+                        id="notes"
+                        required
+                        rows={8}
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                        placeholder="Enter detailed consultation notes..."
+                    />
+                </div>
 
-                <section id="idea" className="relative">
-                    <div className="idea-glow" />
-                    <div className="glass-panel idea-panel">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                            <div>
-                                <p className="text-xs uppercase tracking-[0.2em] text-indigo-200">
-                                    Live AI output
-                                </p>
-                                <h2 className="text-2xl font-semibold text-white">
-                                    Your personalized business opportunity
-                                </h2>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-indigo-100">
-                                <span className={`pulse-dot ${isStreaming ? 'is-active' : ''}`} />
-                                {isStreaming ? 'Streaming in real-time' : 'Ready for another idea'}
-                            </div>
-                        </div>
+                <button 
+                    type="submit" 
+                    disabled={loading}
+                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+                >
+                    {loading ? 'Generating Summary...' : 'Generate Summary'}
+                </button>
+            </form>
 
-                        <div className="idea-scroll markdown-content prose prose-invert">
-                            {error ? (
-                                <div className="error-banner">
-                                    {error}
-                                </div>
-                            ) : showLoader ? (
-                                <div className="idea-loader">
-                                    <div className="equalizer">
-                                        <span />
-                                        <span />
-                                        <span />
-                                    </div>
-                                    <p className="text-sm text-indigo-100 tracking-wide uppercase">
-                                        Brewing your next opportunity
-                                    </p>
-                                </div>
-                            ) : (
-                                <ReactMarkdown
-                                    remarkPlugins={[remarkGfm, remarkBreaks]}
-                                >
-                                    {displayedIdea}
-                                </ReactMarkdown>
-                            )}
-                        </div>
+            {output && (
+                <section className="mt-8 bg-gray-50 dark:bg-gray-800 rounded-xl shadow-lg p-8">
+                    <div className="markdown-content prose prose-blue dark:prose-invert max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                            {output}
+                        </ReactMarkdown>
                     </div>
                 </section>
-            </section>
-        </main>
+            )}
+        </div>
     );
 }
 
-export default function ProductPage() {
+export default function Product() {
     return (
-        <>
-            <SignedIn>
-                <div className="absolute top-6 right-6 z-20">
-                    <UserButton showName afterSignOutUrl="/" />
-                </div>
-                <IdeaLab />
-            </SignedIn>
-            <SignedOut>
-                <main className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white gap-6 px-6 text-center">
-                    <h1 className="text-4xl font-extrabold tracking-tight">Access requires an account</h1>
-                    <p className="text-indigo-100 max-w-xl">
-                        Sign in to generate bespoke business ideas, track your history, and unlock additional product research tools.
-                    </p>
-                    <SignInButton mode="modal">
-                        <button className="button-primary text-base">Sign in to continue</button>
-                    </SignInButton>
-                </main>
-            </SignedOut>
-        </>
+        <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+            {/* User Menu in Top Right */}
+            <div className="absolute top-4 right-4">
+                <UserButton showName={true} />
+            </div>
+
+            {/* Subscription Protection */}
+            <Protect
+                plan="gold"
+                fallback={
+                    <div className="container mx-auto px-4 py-12">
+                        <header className="text-center mb-12">
+                            <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-4">
+                                Healthcare Professional Plan
+                            </h1>
+                            <p className="text-gray-600 dark:text-gray-400 text-lg mb-8">
+                                Streamline your patient consultations with AI-powered summaries
+                            </p>
+                        </header>
+                        <div className="max-w-4xl mx-auto">
+                            <PricingTable />
+                        </div>
+                    </div>
+                }
+            >
+                <ConsultationForm />
+            </Protect>
+        </main>
     );
 }
